@@ -13,6 +13,7 @@ var mongoose = require('mongoose'),
 	BaseImport = require('../base/').Base,
 	config = require('../../config/').get(),
 	logger = config.logger,
+	crypto = require('crypto'),
 	util = require('util'),
 	Schema = mongoose.Schema,
 	Promise = require('bluebird'),
@@ -56,7 +57,10 @@ var UserSchema = Base.extend({
 		trim: true,
 		required: false,
 		default: ""
-	}
+	},
+	lastIPAddress: String,
+	passwordResetToken: String,
+	passwordResetExpires: Date
 },
  {
 	//  _id: false,
@@ -69,7 +73,7 @@ UserSchema.set('validateBeforeSave', true);
 UserSchema.set('toJSON', {
 	virtuals: true,
 	transform: function(doc, ret, field) {
-		ret.employeeObjectId = ret._id;
+		ret.userObjectId = ret._id;
 		delete ret._id;
 		delete ret.__v;
 		delete ret.id;
@@ -84,7 +88,7 @@ UserSchema.set('toJSON', {
  * @return {User} user
  * @api For administrator
  */
-UserSchema.statics.saveEmployee = function(userObj, callback) {
+UserSchema.statics.saveUser = function(userObj, callback) {
 	var that = this;
 	this.find({
 			username : userObj.username,
@@ -99,9 +103,9 @@ UserSchema.statics.saveEmployee = function(userObj, callback) {
 						username: userObj.username,
 						isDeleted: false
 					},
-					{$set:empObj},
+					{$set:userObj},
 					{new : true},
-					function(err, employeeDoc) {
+					function(err, userDoc) {
 						if (err) {
 							callback(err, null);
 						} else {
@@ -109,16 +113,16 @@ UserSchema.statics.saveEmployee = function(userObj, callback) {
 						}
 					});
 			} else {
-				var employee = new that(userObj);
-				employee.save(callback);
+				var user = new that(userObj);
+				// user.password = user.generateHash();
+				user.save(callback);
 			}
 		});
 };
-UserSchema.statics.updateEmployeeProfile = function(empObj, callback) {
+UserSchema.statics.updateUserProfile = function(userObj, callback) {
 	this.findOneAndUpdate({
-			tenantID : empObj.tenantID,
-			emailAddress: empObj.emailAddress,
-			isDeleted: false
+			username : empObj.username,
+			isDeleted : false
 		},
 		{$set:empObj},
 		{new : true},callback);
@@ -131,11 +135,43 @@ UserSchema.statics.updateEmployeeProfile = function(empObj, callback) {
  * @return {User} employeeObject
  * @api public
  */
-UserSchema.statics.findByEmail = function(email, cb) {
+UserSchema.statics.findByUsername = function(username, cb) {
 	return this.findOne({
-			emailAddress: email
+			username : username,
+			isDeleted : false
 		})
 		.exec(cb);
+};
+
+//Instance Method to generate encrypted password
+UserSchema.methods.generateHash = function(password) {
+	password = password || this.password; //If not password in arguments
+	return bcrypt.hashSync(password, bcrypt.genSaltSync(10), null);
+};
+
+//Instance Method to generate compare password
+UserSchema.methods.validPassword = function(password) {
+	return bcrypt.compareSync(password, this.password);
+};
+
+/**
+ * Delete `User` by its _id
+ *
+ * @param {String} _id
+ * @return {Error} err
+ * @return {User} employeeObject
+ * @api public
+ */
+UserSchema.statics.deleteUserById = function(_id, cb) {
+	this.findOneAndUpdate({
+					_id : _id,
+					isDeleted : false
+				},
+				{
+					$set:{
+					isDeleted : true
+					}
+				}).exec(cb);
 };
 
 /**

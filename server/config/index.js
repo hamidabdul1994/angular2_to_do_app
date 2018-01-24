@@ -304,8 +304,6 @@ function getStackInfo (stackIndex) {
 	}
 }
 
-var tanents = {};
-
 /**
  * @description Set tanent object as the initial server starts.
  * @param {object} config Config object for further
@@ -479,7 +477,6 @@ module.exports = {
 
 					config = this.config;
 
-					//luscaSecurity(config);
 				} catch (err) {
 					console.trace(err);
 					console.log("Error: ", err, JSON.stringify(err));
